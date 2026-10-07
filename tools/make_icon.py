@@ -3,13 +3,17 @@
 サムネイル用アイコンを作るスクリプト（追加インストール不要・Python標準機能だけ）
 
 使い方（Narostudio フォルダで実行）:
-    python3 tools/make_icon.py cd   images/915_cd.png 7FC786   ← BGM・歌モノ用のCD
-    python3 tools/make_icon.py note images/a27_n.png  7FC786   ← ジングル用の音符
+    python3 tools/make_icon.py cd     images/915_cd.png 7FC786   ← BGM用のCD
+    python3 tools/make_icon.py vocal  images/993_cd.png 7FC786   ← 歌モノ用（中心がくり抜かれたCD）
+    python3 tools/make_icon.py note   images/a27_n.png  7FC786   ← ジングル用の音符
 
 色は6桁のカラーコード（#は付けても付けなくてもOK）。
-どちらも 800x800 で、既存のアイコンと同じ寸法・同じ形になります。
+すべて 800x800 で、既存のアイコンと同じ寸法・同じ形になります。
 音符は既存のアイコンから形を借りてくるので、images/ の中に音符アイコンが
 1つ以上残っている必要があります。
+
+ジャンルとアイコンの対応:
+    ジングル → note    BGM → cd    歌モノ → vocal
 """
 import os
 import struct
@@ -18,8 +22,15 @@ import zlib
 
 SIZE = 800
 C = SIZE / 2.0
-R_DISC, R_RING, R_HOLE, R_CORE = 250.0, 105.0, 70.0, 45.0  # CDの各半径
 SS = 3  # 輪郭をなめらかにするための分割数
+
+# 白く塗る半径の区間。中心から外へ向かって、区間に入るところだけ白くなる。
+# サムネは188px・再生ボタンは56px固定なので、800換算でボタンの半径は約119。
+# 歌モノの穴（170）はそれより大きいので、ボタンに隠れず輪が見える。
+SHAPES = {
+    "cd":    [(45, 70), (105, 250)],   # 中心の芯＋細いリング＋白い盤
+    "vocal": [(170, 340)],             # 中心をくり抜いた、ひと回り大きい盤
+}
 
 
 # ---------- PNGの読み書き ----------
@@ -80,7 +91,7 @@ def write_png(path, w, h, rows):
 
 
 # ---------- CDアイコン ----------
-def make_cd(path, bg):
+def make_disc(path, bg, bands):
     rows = []
     for y in range(SIZE):
         row = bytearray()
@@ -91,8 +102,7 @@ def make_cd(path, bg):
                     px = x + (sx + 0.5) / SS - C
                     py = y + (sy + 0.5) / SS - C
                     d = (px * px + py * py) ** 0.5
-                    # 中心から外へ：色 → 白 → 色のリング → 白い盤面 → 背景色
-                    if (R_CORE < d <= R_HOLE) or (R_RING < d <= R_DISC):
+                    if any(a < d <= b for a, b in bands):
                         white += 1
             a = white / (SS * SS)
             row += bytes(round(255 * a + bg[i] * (1 - a)) for i in range(3))
@@ -133,10 +143,13 @@ def make_note(path, bg):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 4 or sys.argv[1] not in ("cd", "note"):
+    if len(sys.argv) != 4 or sys.argv[1] not in ("cd", "vocal", "note"):
         raise SystemExit(__doc__)
     kind, dst, color = sys.argv[1], sys.argv[2], sys.argv[3].lstrip("#")
     if len(color) != 6:
         raise SystemExit("色は6桁のカラーコードで指定してください（例 7FC786）")
     rgb = tuple(int(color[i:i + 2], 16) for i in (0, 2, 4))
-    (make_cd if kind == "cd" else make_note)(dst, rgb)
+    if kind == "note":
+        make_note(dst, rgb)
+    else:
+        make_disc(dst, rgb, SHAPES[kind])
