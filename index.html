@@ -927,12 +927,18 @@
         const audio = track.querySelector('audio');
         const durationSpan = track.querySelector('.duration');
 
-        audio.addEventListener('loadedmetadata', () => {
+        // 再生時間を表示する
+        const showDuration = () => {
           const duration = audio.duration;
+          if (!duration || !isFinite(duration)) return;
           const minutes = Math.floor(duration / 60);
           const seconds = Math.floor(duration % 60).toString().padStart(2, '0');
           durationSpan.textContent = `${minutes}:${seconds}`;
-        });
+        };
+
+        audio.addEventListener('loadedmetadata', showDuration);
+        // すでに読み込み済みの曲はイベントが来ないので、その場で表示する
+        if (audio.readyState >= 1) showDuration();
 
         audio.addEventListener('ended', () => {
           track.classList.remove('playing');
